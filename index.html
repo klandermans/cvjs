@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <title>OpenCV.js ChArUco detectie</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #status {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+
+<h1>OpenCV.js ChArUco detectie</h1>
+<p>Upload een afbeelding om een ChArUco-bord te detecteren.</p>
+
+<input type="file" id="fileInput" accept="image/*" />
+<div id="status">Wacht op OpenCV.js...</div>
+<br/>
+<canvas id="canvasOutput"></canvas>
+
+<script async src="https://unpkg.com/@techstark/opencv-js@4.8.1/dist/opencv.js" onload="onOpenCvReady();"></script>
+
+<script>
+let src, gray;
+let canvas = document.getElementById('canvasOutput');
+let context = canvas.getContext('2d');
+let statusDiv = document.getElementById('status');
+
+function showStatus(message) {
+    statusDiv.textContent = message;
+    console.log(message);
+}
+
+function onOpenCvReady() {
+    showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        let file = e.target.files[0];
+        if (file) {
+            showStatus("Afbeelding aan het inladen...");
+            let reader = new FileReader();
+            reader.onload = function(event) {
+                let img = new Image();
+                img.onload = function() {
+                    detectCharuco(img);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }, false);
+}
+
+function detectCharuco(img) {
+    let dictionary, detectorParameters, charucoBoard, corners, ids, rejectedImgPoints, charucoCorners, charucoIds;
+    
+    try {
+        if (!cv) {
+            throw new Error("OpenCV.js is niet geladen.");
+        }
+        
+        showStatus("Afbeelding aan het verwerken...");
+
+        // Maak de canvasgrootte passend voor de afbeelding
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0, img.width, img.height);
+        
+        // Maak een OpenCV-matrix van de afbeelding
+        src = cv.imread(img);
+        gray = new cv.Mat();
+        cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+
+        // Bepaal het woordenboek en de parameters voor de detectie
+        dictionary = new cv.aruco.Dictionary(cv.aruco.DICT_6X6_250);
+        detectorParameters = new cv.aruco.DetectorParameters();
+        
+        // De parameters van het ChArUco-bord
+        const squaresX = 5; // Aantal vierkanten in X-richting
+        const squaresY = 7; // Aantal vierkanten in Y-richting
+        const squareLength = 0.04; // Lengte van een vierkant (in willekeurige eenheden)
+        const markerLength = 0.02; // Lengte van een marker (in willekeurige eenheden)
+
+        // Creëer het ChArUco-bord object
+        charucoBoard = new cv.aruco.CharucoBoard(new cv.Size(squaresX, squaresY), squareLength, markerLength, dictionary);
+
+        // Initialiseer variabelen voor de detectie
+        corners = new cv.MatVector();
+        ids = new cv.Mat();
+        rejectedImgPoints = new cv.MatVector();
+        
+        // Stap 1: Detecteer de ArUco-markers
+        cv.aruco.detectMarkers(gray, dictionary, corners, ids, detectorParameters, rejectedImgPoints);
+        
+        charucoCorners = new cv.Mat();
+        charucoIds = new cv.Mat();
+        let detectedMarkersCount = ids.size().height;
+
+        // Stap 2: Interpolatie van de ChArUco-hoeken als er markers zijn gevonden
+        if (detectedMarkersCount > 0) {
+            showStatus(`Gedetecteerd: ${detectedMarkersCount} ArUco markers. Nu ChArUco hoeken aan het interpoleren...`);
+            cv.aruco.interpolateCornersCharuco(corners, ids, gray, charucoBoard, charucoCorners, charucoIds);
+
+            // Stap 3: Teken de gedetecteerde hoeken op de afbeelding
+            cv.aruco.drawDetectedMarkers(src, corners, ids, new cv.Scalar(255, 0, 0, 255)); // Teken ArUco markers in blauw
+            
+            let detectedCharucoCornersCount = charucoIds.size().height;
+            if (detectedCharucoCornersCount > 0) {
+                showStatus(`Succesvol ${detectedCharucoCornersCount} ChArUco hoeken gedetecteerd.`);
+                for (let i = 0; i < detectedCharucoCornersCount; ++i) {
+                    let x = charucoCorners.data32F[i * 2];
+                    let y = charucoCorners.data32F[i * 2 + 1];
+                    let id = charucoIds.data32S[i];
+
+                    cv.circle(src, new cv.Point(x, y), 5, new cv.Scalar(0, 255, 0, 255), -1); // Teken een groene cirkel
+                    cv.putText(src, `id:${id}`, new cv.Point(x + 10, y - 10), cv.FONT_HERSHEY_SIMPLEX, 0.5, new cv.Scalar(255, 0, 0, 255), 1);
+                }
+            } else {
+                showStatus("Geen ChArUco hoeken gevonden. Zijn de markers correct? Probeer een andere afbeelding.");
+            }
+        } else {
+            showStatus("Geen ArUco markers gevonden. De ChArUco-detectie is niet gestart. Probeer een duidelijkere afbeelding.");
+        }
+
+    } catch (err) {
+        showStatus("Er is een fout opgetreden: " + err.message);
+        console.error(err);
+    } finally {
+        // Geheugen vrijgeven
+        if (src) src.delete();
+        if (gray) gray.delete();
+        if (dictionary) dictionary.delete();
+        if (detectorParameters) detectorParameters.delete();
+        if (charucoBoard) charucoBoard.delete();
+        if (corners) corners.delete();
+        if (ids) ids.delete();
+        if (rejectedImgPoints) rejectedImgPoints.delete();
+        if (charucoCorners) charucoCorners.delete();
+        if (charucoIds) charucoIds.delete();
+    }
+    
+    // Geef het resultaat weer op het canvas
+    cv.imshow('canvasOutput', src);
+}
+</script>
+
+</body>
+</html>
