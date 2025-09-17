@@ -33,6 +33,7 @@ let src, gray;
 let canvas = document.getElementById('canvasOutput');
 let context = canvas.getContext('2d');
 let statusDiv = document.getElementById('status');
+let opencvLoaded = false;
 
 function showStatus(message) {
     statusDiv.textContent = message;
@@ -40,7 +41,8 @@ function showStatus(message) {
 }
 
 function onOpenCvReady() {
-    cv.onRuntimeInitialized = () => {
+    if (typeof cv !== 'undefined' && cv.imread) {
+        opencvLoaded = true;
         showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
         document.getElementById('fileInput').addEventListener('change', (e) => {
             let file = e.target.files[0];
@@ -57,17 +59,22 @@ function onOpenCvReady() {
                 reader.readAsDataURL(file);
             }
         }, false);
-    };
+    } else {
+        // Fallback voor als de eerste check faalt.
+        showStatus("OpenCV.js is geladen, maar het object is nog niet volledig beschikbaar. Probeer het over een moment opnieuw.");
+        setTimeout(onOpenCvReady, 50);
+    }
 }
 
 function detectCharuco(img) {
+    if (!opencvLoaded) {
+        showStatus("Fout: OpenCV.js is nog niet volledig geladen.");
+        return;
+    }
+
     let dictionary, detectorParameters, charucoBoard, corners, ids, rejectedImgPoints, charucoCorners, charucoIds;
     
     try {
-        if (!cv) {
-            throw new Error("OpenCV.js is niet geladen.");
-        }
-        
         showStatus("Afbeelding aan het verwerken...");
 
         // Maak de canvasgrootte passend voor de afbeelding
