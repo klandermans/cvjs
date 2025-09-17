@@ -40,22 +40,24 @@ function showStatus(message) {
 }
 
 function onOpenCvReady() {
-    showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
-    document.getElementById('fileInput').addEventListener('change', (e) => {
-        let file = e.target.files[0];
-        if (file) {
-            showStatus("Afbeelding aan het inladen...");
-            let reader = new FileReader();
-            reader.onload = function(event) {
-                let img = new Image();
-                img.onload = function() {
-                    detectCharuco(img);
+    cv.onRuntimeInitialized = () => {
+        showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            let file = e.target.files[0];
+            if (file) {
+                showStatus("Afbeelding aan het inladen...");
+                let reader = new FileReader();
+                reader.onload = function(event) {
+                    let img = new Image();
+                    img.onload = function() {
+                        detectCharuco(img);
+                    };
+                    img.src = event.target.result;
                 };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-    }, false);
+                reader.readAsDataURL(file);
+            }
+        }, false);
+    };
 }
 
 function detectCharuco(img) {
