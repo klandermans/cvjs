@@ -18,7 +18,7 @@
 </head>
 <body>
 
-<h1>OpenCV.js ChArUco detectie 2</h1>
+<h1>OpenCV.js ChArUco detectie</h1>
 <p>Upload een afbeelding om een ChArUco-bord te detecteren.</p>
 
 <input type="file" id="fileInput" accept="image/*" />
@@ -26,55 +26,48 @@
 <br/>
 <canvas id="canvasOutput"></canvas>
 
-<script async src="https://unpkg.com/@techstark/opencv-js@4.11.0-release.1/dist/opencv.js" onload="onOpenCvReady();"></script>
+<script async src="https://unpkg.com/@techstark/opencv-js@4.11.0-release.1/dist/opencv.js"></script>
 
 <script>
 let src, gray;
 let canvas = document.getElementById('canvasOutput');
 let context = canvas.getContext('2d');
 let statusDiv = document.getElementById('status');
-let opencvLoaded = false;
 
 function showStatus(message) {
     statusDiv.textContent = message;
     console.log(message);
 }
 
-function onOpenCvReady() {
-    if (typeof cv !== 'undefined' && cv.imread) {
-        opencvLoaded = true;
-        showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            let file = e.target.files[0];
-            if (file) {
-                showStatus("Afbeelding aan het inladen...");
-                let reader = new FileReader();
-                reader.onload = function(event) {
-                    let img = new Image();
-                    img.onload = function() {
-                        detectCharuco(img);
-                    };
-                    img.src = event.target.result;
+// Correcte initialisatie: wacht op de cv.onRuntimeInitialized callback
+cv.onRuntimeInitialized = () => {
+    showStatus("OpenCV.js is geladen. Klaar voor gebruik.");
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+        let file = e.target.files[0];
+        if (file) {
+            showStatus("Afbeelding aan het inladen...");
+            let reader = new FileReader();
+            reader.onload = function(event) {
+                let img = new Image();
+                img.onload = function() {
+                    detectCharuco(img);
                 };
-                reader.readAsDataURL(file);
-            }
-        }, false);
-    } else {
-        // Fallback voor als de eerste check faalt.
-        showStatus("OpenCV.js is geladen, maar het object is nog niet volledig beschikbaar. Probeer het over een moment opnieuw.");
-        setTimeout(onOpenCvReady, 50);
-    }
-}
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    }, false);
+};
+
 
 function detectCharuco(img) {
-    if (!opencvLoaded) {
-        showStatus("Fout: OpenCV.js is nog niet volledig geladen.");
-        return;
-    }
-
     let dictionary, detectorParameters, charucoBoard, corners, ids, rejectedImgPoints, charucoCorners, charucoIds;
     
     try {
+        if (!cv) {
+            throw new Error("OpenCV.js is niet geladen.");
+        }
+        
         showStatus("Afbeelding aan het verwerken...");
 
         // Maak de canvasgrootte passend voor de afbeelding
